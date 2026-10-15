@@ -1,0 +1,24 @@
+#Build files
+build/
+cmake-build-*/
+
+#Python Enivroment
+.venv/
+__pycache__/
+*.pyc
+
+#Macos
+.DS_Store
+
+# Large genrated datasets
+data/genrated/*
+
+#Directory
+!data/genrated/.gitkeep
+
+#Temp files
+.tmp
+
+#VsS Code local setting
+.vscode/
+
