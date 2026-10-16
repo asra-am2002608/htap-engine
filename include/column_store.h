@@ -12,6 +12,7 @@ public:
     double sum_price_scalar() const;
     std::size_t count_region_scalar(std::uint16_t region) const;
     std::size_t count_price_greater_than_scaler(double threshold) const;
+    std::size_t estimated_memory_bytes() const;
 
 private:
 std::vector<std::uint64_t> order_id_;

@@ -74,3 +74,11 @@ std::size_t ColumnStore::count_price_greater_than_scaler(double threshold) const
     }
     return count;
 }
+
+
+std::size_t ColumnStore::estimated_memory_bytes() const {
+    return order_id_.capacity() * sizeof(std::uint64_t) + customer_id_.capacity() * sizeof(std::uint64_t)
+    + product_id_.capacity()*sizeof(std::uint32_t) + region_.capacity()*sizeof(std::uint16_t)
+    + quantity_.capacity()*sizeof(std::uint32_t) + price_.capacity()*sizeof(double)
+    + status_.capacity()*sizeof(std::uint8_t) + timestamp_.capacity()*sizeof(std::uint64_t);
+}
