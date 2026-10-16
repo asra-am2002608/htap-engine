@@ -1,43 +1,26 @@
 #include <iostream>
 #include "row_store.h"
+#include "data_generator.h"
 
 int main(){
-    RowStore store;
-
-    Order order1{
-        1,
-        1001,
-        501,
-        1,
-        2,
-        199.99,
-        0,
-        100000
-    };
-    Order order2{
-        2,
-        1002,
-        502,
-        2,
-        1,
-        349.50,
-        0,
-        100001
-    };
-    store.insert(order1);
-    store.insert(order2);
-
-    std::cout<<"Inserted the rows: " << store.size() << '\n';
-    auto result=store.lookup(2);
-
-    if (result.has_value()){
-        std:: cout << "found order 2 , the price = " << result->price << '\n';
+    constexpr std::size_t row_count = 100000;
+    DataGenerator generator(42);
+    auto orders = generator.generate_orders(row_count);
+    RowStore store(row_count);
+    for(const auto& order: orders){
+        store.insert(order);
     }
-    store.update_price(2, 399.99);
-    result = store.lookup(2);
+    std::cout<<"Generated rows: " << orders.size() << '\n';
+    std::cout<<"Rows in row store: " << store.size() << '\n';
 
-    if (result.has_value()){
-        std::cout << "Updated price = " << result->price << '\n';
-    }
-    return 0;
+    auto result=store.lookup(50000);
+
+    if(result.has_value()){
+        std::cout << "Ordere 50000 found \n";
+        std::cout << "Price: " << result->price << '\n';
+        std::cout << "Region: " << result->region << '\n';
+
+    } else{
+        std::cout <<"Order 50000 not found \n";
+    } return 0;
 }
