@@ -14,6 +14,10 @@ public:
     bool update_status(std::uint64_t order_id, std::uint8_t new_status);
     std::size_t size() const;
     const std::vector<Order>& rows() const;
+    double sum_price_scalar() const;
+    std::size_t count_region_scalar(std::uint16_t region) const;
+    std::size_t count_price_greater_than_scalar(double threshold) const;
+
 
 private:
     std::vector<Order> rows_;

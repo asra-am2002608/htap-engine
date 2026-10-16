@@ -46,3 +46,28 @@ std::size_t RowStore::size() const {
 const std::vector<Order>& RowStore::rows() const {
     return rows_;
 }
+
+double RowStore::sum_price_scalar() const{
+    double total = 0.0;
+    for (const auto& order : rows_){
+        total +=order.price;
+    } return total;
+}
+
+std::size_t RowStore::count_region_scalar(std::uint16_t region) const {
+    std::size_t count =0;
+    for (const auto& order : rows_){
+        if(order.region == region){
+            ++count;
+        }
+        } return count;
+}
+
+std::size_t RowStore::count_price_greater_than_scalar(double threshold) const{
+    std::size_t count =0;
+    for(const auto& order :rows_){
+        if(order.price > threshold){
+            ++count;
+        }
+    }return count;
+}
