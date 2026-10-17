@@ -17,7 +17,7 @@ public:
     double sum_price_scalar() const;
     std::size_t count_region_scalar(std::uint16_t region) const;
     std::size_t count_price_greater_than_scalar(double threshold) const;
-
+    const Order& at(std::size_t row_index) const;
 
 private:
     std::vector<Order> rows_;

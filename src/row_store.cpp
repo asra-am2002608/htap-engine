@@ -71,3 +71,7 @@ std::size_t RowStore::count_price_greater_than_scalar(double threshold) const{
         }
     }return count;
 }
+
+const Order& RowStore::at(std::size_t row_index) const{
+    return rows_.at(row_index);
+}

@@ -18,6 +18,9 @@ public:
     std:: size_t count_price_greater_than_scalar(double threshold) const;
     std::size_t estimated_memory_bytes() const;
 
+    bool update_price_at(std::size_t row_idex, double new_price);
+    double price_at(std::size_t row_index) const;
+
 private:
     bool region_materialized_;
     bool quantity_materialized_;

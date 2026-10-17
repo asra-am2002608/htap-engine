@@ -151,3 +151,27 @@ std::size_t SelectiveColumnStore::estimated_memory_bytes() const {
     }
     return total;
 }
+
+bool SelectiveColumnStore::update_price_at(std::size_t row_index, double new_price){
+    if(!price_materialized_){
+        return false;
+    }
+    if(row_index >= price_.size()){
+        return false;
+    }
+    price_[row_index] =new_price;
+    return true;
+
+}
+
+
+double SelectiveColumnStore::price_at(std::size_t row_index) const{
+    if(!price_materialized_){
+        throw std::runtime_error("Price column is not materialized");
+    }
+    if(row_index >=price_.size()){
+        throw std::out_of_range("Price row is out of range");
+
+    }
+    return price_[row_index];
+}
