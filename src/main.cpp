@@ -10,9 +10,9 @@
 #include "change_buffer.h"
 
 int main(){
-    constexpr std::size_t row_count = 100000;
+    constexpr std::size_t row_count = 1000000;
     constexpr std::size_t materialization_threshold = 50;
-    constexpr std::size_t sync_batch_size=4;
+    /*constexpr std::size_t sync_batch_size=4;*/
 
     DataGenerator generator(42);
     auto orders = generator.generate_orders(row_count);
@@ -33,20 +33,64 @@ int main(){
     {
         profiler.record_access(ColumnId::Region);
     }
+        
+    for (int i = 0; i < 20; ++i)
+    {
+        profiler.record_access(ColumnId::Quantity);
+    }
+    for (int i = 0; i < 5; ++i)
+    {
+        profiler.record_access(ColumnId::Status);
+    }
    
     const auto selected_columns = profiler.selected_columns();
 
 
-    SelectiveColumnStore selective_column_store(row_count);
-    selective_column_store.materialize(row_store.rows(),selected_columns);
+    SelectiveColumnStore column_store(row_count);
+    column_store.materialize(row_store.rows(),selected_columns);
+    
+    
+    std::cout << "Selected column count: "<< selected_columns.size()<< '\n';
 
-    ChangeBuffer change_buffer(sync_batch_size);
+    std::cout << "Price materialized: "<< (column_store.has_column(ColumnId::Price)? "YES": "NO" ) << '\n';
 
-    constexpr std::size_t target_row = 10;
+    std::cout << "Region materialized: " << (column_store.has_column(ColumnId::Region)? "YES": "NO")<< '\n';
+
+
+    std::cout << "Rows: " << row_count << '\n';
+    std::cout << "SIMD available:: " << (SelectiveColumnStore::simd_available() ? "YES" : "NO")  << '\n';
+    /*constexpr std::size_t target_row = 10;
     const double original_row_price = row_store.at(target_row).price;
-    const double original_column_price = selective_column_store.price_at(target_row);
+    const double original_column_price = selective_column_store.price_at(target_row);*/
+
+    const double scalar_sum=column_store.sum_price_scalar();
+    const double simd_sum = column_store.sum_price_simd();
+
+    std::cout << "\nSum Price\n";
+    std::cout << "Scalar " << scalar_sum << '\n';
+    std::cout << "SIMD " << simd_sum << '\n';
+
+    const double sum_difference = std::abs(scalar_sum - simd_sum);
+    const double sum_tolerance = std::abs(scalar_sum) * 1e-10;
+    const bool sum_correct = sum_difference<= sum_tolerance;
+
+    constexpr double threshold = 500.0;
+    const std::size_t scalar_count = column_store.count_price_greater_than_scalar(threshold);
+    const std::size_t simd_count = column_store.count_price_greater_than_simd(threshold);
+    
+    std::cout << "\nCount Price (price > 500)\n";
+    std::cout << "Scalar " << scalar_count<< '\n';
+    std::cout << "SIMD " << simd_count << '\n';
+    const bool count_correct = scalar_count ==simd_count;
+
+    const bool correct = sum_correct && count_correct; 
+    
+    std::cout <<"\nSIMD correctness: " << (correct ? "Passed " : "Failed ") << '\n';
+    return correct ? 0:1;
+}
 
 
+/*
     std::cout << "Before update \n";
     std::cout << "Row-store price:  " << original_row_price << '\n';
     std::cout << "Column-store price:  " << original_column_price << '\n';
@@ -95,7 +139,7 @@ int main(){
     return correct ? 0:1;
 
 
-    /*std::cout << "Workload access counts \n";
+    std::cout << "Workload access counts \n";
     std::cout << "Price: " << profiler.access_count(ColumnId::Price) << '\n';
     std::cout << "Region: " << profiler.access_count(ColumnId::Region) << '\n';
     std::cout << "Quantity: " << profiler.access_count(ColumnId::Quantity) << '\n';
@@ -151,6 +195,6 @@ int main(){
 
     std::cout << "\nCorrectness chaeck: \n" << (correct ? "Passed" : "Failed")  << '\n';
 
-    return correct ? 0:1;*/
+    return correct ? 0:1;
 
-}
+}*/

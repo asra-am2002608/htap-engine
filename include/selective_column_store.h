@@ -14,12 +14,17 @@ public:
     bool has_column(ColumnId column) const;
     double sum_price_scalar() const;
 
+    double sum_price_simd() const;
+
     std:: size_t count_region_scalar(std::uint16_t region) const;
     std:: size_t count_price_greater_than_scalar(double threshold) const;
+    std::size_t count_price_greater_than_simd(double threshold) const;
     std::size_t estimated_memory_bytes() const;
 
     bool update_price_at(std::size_t row_idex, double new_price);
     double price_at(std::size_t row_index) const;
+
+    static bool simd_available();
 
 private:
     bool region_materialized_;

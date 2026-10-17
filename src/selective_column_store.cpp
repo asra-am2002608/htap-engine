@@ -1,6 +1,10 @@
 #include "selective_column_store.h"
 #include <stdexcept>
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#endif
+
 SelectiveColumnStore::SelectiveColumnStore(std::size_t reserve_size):
     region_materialized_(false), quantity_materialized_(false), price_materialized_(false), status_materialized_(false){
 
@@ -174,4 +178,68 @@ double SelectiveColumnStore::price_at(std::size_t row_index) const{
 
     }
     return price_[row_index];
+}
+
+bool SelectiveColumnStore::simd_available(){
+#if defined(__aarch64__) || defined(_M_ARM64)
+    return true;
+#else 
+    return false;
+#endif
+}
+
+double SelectiveColumnStore::sum_price_simd() const{
+    if (!price_materialized_){
+        throw std::runtime_error("Price column is not materilaized");
+    }
+#if defined(__aarch64__) || defined(_M_ARM64)
+    std::size_t i =0;
+    float64x2_t accumulator = vdupq_n_f64(0.0);
+    for (; i+1 < price_.size(); i+=2){
+        const float64x2_t values = vld1q_f64(&price_[i]);
+        accumulator = vaddq_f64(accumulator, values);
+    }
+    double lanes[2];
+    vst1q_f64(lanes, accumulator);
+    double total = lanes[0]+lanes[1];
+
+    for(; i <price_.size(); ++i){
+        total+=price_[i];
+    }
+
+    return total;
+#else
+    return sum_price_scalar();
+#endif
+}
+
+std::size_t SelectiveColumnStore::count_price_greater_than_simd( double threshold) const{
+    if (!price_materialized_){
+        throw std::runtime_error("Price column is not materilaized");
+    }
+#if defined(__aarch64__) || defined(_M_ARM64)
+    std::size_t count = 0;
+    std::size_t i =0;
+    const float64x2_t threshold_vector = vdupq_n_f64(threshold);
+   for (; i+1 < price_.size(); i+=2){
+        const float64x2_t values = vld1q_f64(&price_[i]);
+        const uint64x2_t mask = vcgtq_f64(values, threshold_vector);
+
+        if(vgetq_lane_u64(mask, 0) !=0){
+            ++count;
+        }
+        if(vgetq_lane_u64(mask, 1) !=0){
+            ++count;
+        }
+    }
+        for(; i <price_.size(); ++i){
+            if(price_[i]>threshold){
+                ++count;
+            }  
+    }
+
+    return count;
+#else
+    return count_price_greater_than_scalar(threshold);
+#endif
 }
