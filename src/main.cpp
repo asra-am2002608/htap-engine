@@ -2,12 +2,15 @@
 #include <cmath>
 #include <iomanip>
 #include <chrono>
+#include <cstddef>
 #include "row_store.h"
 #include "data_generator.h"
 #include "column_store.h"
 #include "selective_column_store.h"
 #include "workload_profiler.h"
 #include "change_buffer.h"
+#include "column_id.h"
+#include "workload_runner.h"
 
 int main(){
     constexpr std::size_t row_count = 1000000;
@@ -50,27 +53,65 @@ int main(){
     column_store.materialize(row_store.rows(),selected_columns);
     
     
-    std::cout << "Selected column count: "<< selected_columns.size()<< '\n';
+    std::cout << "Rows: "<< row_count<< '\n';
 
     std::cout << "Price materialized: "<< (column_store.has_column(ColumnId::Price)? "YES": "NO" ) << '\n';
-
-    std::cout << "Region materialized: " << (column_store.has_column(ColumnId::Region)? "YES": "NO")<< '\n';
-
-
-    std::cout << "Rows: " << row_count << '\n';
     std::cout << "SIMD available:: " << (SelectiveColumnStore::simd_available() ? "YES" : "NO")  << '\n';
+
+    //std::cout << "Region materialized: " << (column_store.has_column(ColumnId::Region)? "YES": "NO")<< '\n';
+
+
+    //std::cout << "Rows: " << row_count << '\n';
+    //std::cout << "SIMD available:: " << (SelectiveColumnStore::simd_available() ? "YES" : "NO")  << '\n';
     /*constexpr std::size_t target_row = 10;
     const double original_row_price = row_store.at(target_row).price;
     const double original_column_price = selective_column_store.price_at(target_row);*/
 
-    const double scalar_sum=column_store.sum_price_scalar();
-    const double simd_sum = column_store.sum_price_simd();
+    WorkloadConfig config;
+    config.thread_count =4;
+    config.operations_per_thread=50;
+    config.oltp_percent=50;
+    config.sync_batch_size = 16;
+    config.sync_interval=std::chrono::milliseconds(5);
 
-    std::cout << "\nSum Price\n";
-    std::cout << "Scalar " << scalar_sum << '\n';
-    std::cout << "SIMD " << simd_sum << '\n';
 
-    const double sum_difference = std::abs(scalar_sum - simd_sum);
+    //const double scalar_sum=column_store.sum_price_scalar();
+    //const double simd_sum = column_store.sum_price_simd();
+
+    std::cout << "\nMixed Workload Config\n";
+    std::cout << "Threads:  " << config.thread_count << '\n';
+    std::cout << "Operations per thread:  " << config.operations_per_thread << '\n';
+    std::cout << "Target OLTP percentage:  " << config.oltp_percent << "%\n";
+
+    WorkloadRunner runner(row_store,column_store);
+    const WorkloadResult result = runner.run(config);
+    const std::uint64_t total_operations = result.oltp_operations + result.olap_operations;
+
+    const double actual_oltp_percent= total_operations > 0 ? 100.0 * static_cast<double>(result.oltp_operations) / static_cast<double>(total_operations) : 0.0;
+    std::cout << "\nResults\n";
+    std::cout << "OLTP operations:  " << result.oltp_operations << '\n';
+    std::cout << "OLAP operations:  " << result.olap_operations << '\n';
+    std::cout << "Actual OLTP percentage:  " << std::fixed << std::setprecision(2) << actual_oltp_percent << "%\n";
+    std::cout << "Synchronized changes:  " << result.synchronized_changes << '\n';
+    std::cout << "Elapsed time:  " << result.elapsed_seconds << "s\n";
+    std::cout << "Combined throughput:  " << result.throughput_ops_per_second << "ops/s\n";
+
+    const double row_sum =row_store.sum_price_scalar();
+    const double column_sum =column_store.sum_price_scalar();
+    const double differences = std::abs(row_sum- column_sum);
+    const double tolerance = std::abs(row_sum) * 1e-10;
+    const bool operations_count_correct = total_operations ==config.thread_count * config.operations_per_thread;
+    const bool stores_consistent = differences <= tolerance;
+    const bool correct = operations_count_correct && stores_consistent;
+
+    std::cout << "\nFinal row/column consistncy:  " << (stores_consistent ? "PASSED" : "FAILED") << '\n';
+    std::cout << "\nMixed woarkload correctness:  " << (correct ? "PASSED" : "FAILED") << '\n';
+
+    return correct ? 0: 1;
+}
+
+
+   /* const double sum_difference = std::abs(scalar_sum - simd_sum);
     const double sum_tolerance = std::abs(scalar_sum) * 1e-10;
     const bool sum_correct = sum_difference<= sum_tolerance;
 
@@ -87,7 +128,7 @@ int main(){
     
     std::cout <<"\nSIMD correctness: " << (correct ? "Passed " : "Failed ") << '\n';
     return correct ? 0:1;
-}
+}*/
 
 
 /*

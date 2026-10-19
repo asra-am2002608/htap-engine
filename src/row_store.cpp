@@ -75,3 +75,11 @@ std::size_t RowStore::count_price_greater_than_scalar(double threshold) const{
 const Order& RowStore::at(std::size_t row_index) const{
     return rows_.at(row_index);
 }
+
+bool RowStore::update_price_at(std::size_t row_index, double new_price){
+    if(row_index >=rows_.size()){
+        return false;
+    }
+    rows_[row_index].price=new_price;
+    return true;
+}
