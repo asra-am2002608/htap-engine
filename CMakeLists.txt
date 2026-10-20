@@ -15,7 +15,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSION OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(htap_engine src/main.cpp src/row_store.cpp src/data_generator.cpp src/column_store.cpp src/selective_column_store.cpp src/workload_profiler.cpp src/change_buffer.cpp src/workload_runner.cpp)
+add_executable(htap_engine src/main.cpp src/row_store.cpp src/data_generator.cpp src/column_store.cpp src/selective_column_store.cpp src/workload_profiler.cpp src/change_buffer.cpp src/workload_runner.cpp src/metrics.cpp)
 
 target_include_directories(htap_engine PRIVATE include)
 

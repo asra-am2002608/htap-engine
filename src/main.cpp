@@ -11,6 +11,7 @@
 #include "change_buffer.h"
 #include "column_id.h"
 #include "workload_runner.h"
+#include "metrics.h"
 
 int main(){
     constexpr std::size_t row_count = 1000000;
@@ -83,8 +84,19 @@ int main(){
     std::cout << "Operations per thread:  " << config.operations_per_thread << '\n';
     std::cout << "Target OLTP percentage:  " << config.oltp_percent << "%\n";
 
-    WorkloadRunner runner(row_store,column_store);
+    MetricsCollector metrics;
+    WorkloadRunner runner(row_store,column_store, metrics);
     const WorkloadResult result = runner.run(config);
+    metrics.write_oprations_csv("../results/raw/operations.csv");
+
+
+    const auto oltp_read_latency = metrics.latency_summary("OLTP_READ");
+    const auto oltp_update_latency = metrics.latency_summary("OLTP_UPDATE");
+    const auto olap_sum_latency = metrics.latency_summary("OLAP_SUM");
+    const auto olap_filter_latency = metrics.latency_summary("OLAP_FILTER");
+
+
+
     const std::uint64_t total_operations = result.oltp_operations + result.olap_operations;
 
     const double actual_oltp_percent= total_operations > 0 ? 100.0 * static_cast<double>(result.oltp_operations) / static_cast<double>(total_operations) : 0.0;
@@ -95,6 +107,13 @@ int main(){
     std::cout << "Synchronized changes:  " << result.synchronized_changes << '\n';
     std::cout << "Elapsed time:  " << result.elapsed_seconds << "s\n";
     std::cout << "Combined throughput:  " << result.throughput_ops_per_second << "ops/s\n";
+   
+    std::cout << "\nLatency percentile (us)\n";
+    std::cout << "OLTP_READ P50/P90/P99: " << oltp_read_latency.p50_us << " / " << oltp_read_latency.p90_us << " / " << oltp_read_latency.p99_us << '\n';
+    std::cout << "OLTP_UPDATE P50/P90/P99: " << oltp_update_latency.p50_us << " / " << oltp_update_latency.p90_us << " / " << oltp_update_latency.p99_us << '\n';
+    std::cout << "OLAP_SUM P50/P90/P99: " << olap_sum_latency.p50_us << " / " << olap_sum_latency.p90_us << " / " << olap_sum_latency.p99_us << '\n';
+    std::cout << "OLAP_FILTER P50/P90/P99: " << olap_filter_latency.p50_us << " / " << olap_filter_latency.p90_us << " / " << olap_filter_latency.p99_us << '\n';
+
 
     const double row_sum =row_store.sum_price_scalar();
     const double column_sum =column_store.sum_price_scalar();
@@ -106,6 +125,7 @@ int main(){
 
     std::cout << "\nFinal row/column consistncy:  " << (stores_consistent ? "PASSED" : "FAILED") << '\n';
     std::cout << "\nMixed woarkload correctness:  " << (correct ? "PASSED" : "FAILED") << '\n';
+    std::cout << "Raw trace file:" << "../results/raw/operations.csv" << '\n';
 
     return correct ? 0: 1;
 }

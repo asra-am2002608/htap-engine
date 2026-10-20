@@ -5,6 +5,7 @@
 
 class RowStore;
 class SelectiveColumnStore;
+class MetricsCollector;
 
 struct WorkloadConfig{
         std::size_t thread_count = 4;
@@ -25,11 +26,12 @@ struct WorkloadResult{
 
 class WorkloadRunner {
 public:
-    WorkloadRunner(RowStore& row_store,SelectiveColumnStore& column_store);
+    WorkloadRunner(RowStore& row_store,SelectiveColumnStore& column_store, MetricsCollector& metrics);
     WorkloadResult run(const WorkloadConfig& config);
 
 
 private:
     RowStore& row_store_;
     SelectiveColumnStore& column_store_;
+    MetricsCollector& metrics_;
 };

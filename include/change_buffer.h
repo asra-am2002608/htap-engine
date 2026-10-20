@@ -11,7 +11,7 @@ public:
     void push(const ChangeRecord& change);
     bool should_flush() const;
     std::size_t size() const;
-    std::size_t flush(SelectiveColumnStore& column_store);
+    std::size_t flush(SelectiveColumnStore& column_store, std::vector<double> * freshness_us = nullptr);
 
 private:
     std::size_t batch_size_;

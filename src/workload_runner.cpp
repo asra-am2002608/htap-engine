@@ -1,10 +1,10 @@
 #include "workload_runner.h"
-
+#include "metrics.h"
 #include "change_buffer.h"
 #include "column_id.h"
 #include "row_store.h"
 #include "selective_column_store.h"
-
+#include <string>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -14,8 +14,8 @@
 #include <thread>
 #include <vector>
 
-WorkloadRunner::WorkloadRunner(RowStore& row_store, SelectiveColumnStore& column_store)
-    : row_store_(row_store), column_store_(column_store) {}
+WorkloadRunner::WorkloadRunner(RowStore& row_store, SelectiveColumnStore& column_store, MetricsCollector& metrics)
+    : row_store_(row_store), column_store_(column_store), metrics_(metrics) {}
 
 WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
     using Clock = std::chrono::steady_clock;
@@ -38,9 +38,6 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
 
     ChangeBuffer change_buffer(config.sync_batch_size);
 
-    // ------------------------------------
-    // Background synchronization thread
-    // ------------------------------------
 
     std::thread sync_thread([&]() {
         auto last_flush = Clock::now();
@@ -61,11 +58,14 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
                 const bool final_flush = stop_requested && change_buffer.size() > 0;
 
                 if (batch_ready || interval_expired || final_flush) {
-
-                    const std::size_t applied = change_buffer.flush(column_store_);
-
+                    std::vector<double>freshness_values;
+                    const std::size_t applied = change_buffer.flush(column_store_, &freshness_values);
                     synchronized_changes.fetch_add(applied,std::memory_order_relaxed);
-
+                    for (double freshness : freshness_values){
+                        const auto timestamp = Clock::now();
+                        const std::uint64_t timestamp_us = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count());
+                        metrics_.record(OperationTrace{timestamp_us, 0 , "SYNC", 0.0, 0, freshness});
+                    }
                     last_flush = Clock::now();
                 }
 
@@ -81,10 +81,6 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
     });
-
-    // ------------------------------------
-    // Start mixed workload
-    // ------------------------------------
 
     const auto start_time =Clock::now();
 
@@ -103,12 +99,10 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
                 std::uint64_t local_checksum = 0;
 
                 for (std::size_t operation = 0;operation <config.operations_per_thread;++operation) {
-
+                    const auto operation_start = Clock::now();
+                    std::string operation_type;
+                    std::size_t trace_row_index =0;
                     const bool is_oltp =workload_choice(rng) <=config.oltp_percent;
-
-                    // --------------------
-                    // OLTP
-                    // --------------------
 
                     if (is_oltp) {
                         const std::size_t row_index =row_choice(rng);
@@ -116,6 +110,8 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
                         const bool do_update = oltp_choice(rng) == 1;
 
                         if (do_update) {
+                            operation_type = "OLTP_UPDATE";
+                            trace_row_index = row_index;
                             double new_price = 0.0;
                             auto commit_time =Clock::now();
 
@@ -135,6 +131,8 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
                                 }
                             }
                         } else {
+                            operation_type = "OLTP_READ";
+                            trace_row_index = row_index;
                             std::shared_lock lock(row_mutex);
 
                             const double observed =row_store_.at(row_index).price;
@@ -153,18 +151,30 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
                         std::shared_lock lock(column_mutex);
 
                         if (operation % 2 == 0) {
+                            operation_type = "OLAP_SUM";
                             const double sum =column_store_.sum_price_simd();
 
                             local_checksum += static_cast<std::uint64_t>(sum);
 
                         } else {
+                            operation_type = "OLAP_FILTER";
                             const std::size_t count =column_store_.count_price_greater_than_simd(500.0);
                             local_checksum += count;
                         }
 
                         olap_completed.fetch_add(1,std::memory_order_relaxed);
                     }
+                    const auto operation_end =Clock::now();
+
+                    const double latency_us =std::chrono::duration<double,std::micro>(operation_end -operation_start).count();
+
+                    const std::uint64_t timestamp_us =static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(operation_end.time_since_epoch()).count());
+
+                    metrics_.record(OperationTrace{timestamp_us,thread_id,operation_type,latency_us,trace_row_index,0.0});
+
                 }
+
+
 
                 if (local_checksum == 0) {
                     std::this_thread::yield();
