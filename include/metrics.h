@@ -26,7 +26,7 @@ public:
     void record(const OperationTrace& trace);
     std::vector<OperationTrace> traces() const;
     LatencySummary latency_summary(const std::string& operation_type) const;
-    void write_oprations_csv(const std::string& path) const;
+    void write_operations_csv(const std::string& path) const;
 private:
     mutable std::mutex mutex_;
     std::vector<OperationTrace> traces_;

@@ -3,6 +3,9 @@
 #include <iomanip>
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
+#include <string>
+#include <fstream>
 #include "row_store.h"
 #include "data_generator.h"
 #include "column_store.h"
@@ -13,10 +16,32 @@
 #include "workload_runner.h"
 #include "metrics.h"
 
-int main(){
-    constexpr std::size_t row_count = 1000000;
+int main(int argc, char* argv[]){
+    std::size_t row_count = 1000000;
+    std::size_t thread_count = 4;
+    std::size_t operations_per_thread = 1000;
+    int oltp_percent = 50;
+    std::size_t sync_batch_size = 16;
     constexpr std::size_t materialization_threshold = 50;
     /*constexpr std::size_t sync_batch_size=4;*/
+
+    if (argc > 1){
+        row_count = static_cast<std::size_t>(std::stoull(argv[1]));
+    }
+    if (argc > 2){
+        thread_count = static_cast<std::size_t>(std::stoull(argv[2]));
+    }
+    if (argc > 3){
+        operations_per_thread = static_cast<std::size_t>(std::stoull(argv[3]));
+    }
+    if (argc > 4){
+        oltp_percent = std::stoi(argv[4]);
+    }
+    if (argc > 5){
+        sync_batch_size = static_cast<std::size_t>(std::stoull(argv[5]));
+    }
+
+
 
     DataGenerator generator(42);
     auto orders = generator.generate_orders(row_count);
@@ -69,10 +94,10 @@ int main(){
     const double original_column_price = selective_column_store.price_at(target_row);*/
 
     WorkloadConfig config;
-    config.thread_count =4;
-    config.operations_per_thread=50;
-    config.oltp_percent=50;
-    config.sync_batch_size = 16;
+    config.thread_count = thread_count;
+    config.operations_per_thread = operations_per_thread;
+    config.oltp_percent = oltp_percent;
+    config.sync_batch_size = sync_batch_size;
     config.sync_interval=std::chrono::milliseconds(5);
 
 
@@ -87,14 +112,16 @@ int main(){
     MetricsCollector metrics;
     WorkloadRunner runner(row_store,column_store, metrics);
     const WorkloadResult result = runner.run(config);
-    metrics.write_oprations_csv("../results/raw/operations.csv");
+    const std::string trace_path = "../results/raw/operations_"+ std::to_string(row_count)+ "_"+
+    std::to_string(thread_count) + "_" + std::to_string(oltp_percent) + "_" + std::to_string(sync_batch_size) + ".csv";
+    metrics.write_operations_csv(trace_path);
 
-
+    std::cout << "Raw trace file: " << trace_path << '\n';
     const auto oltp_read_latency = metrics.latency_summary("OLTP_READ");
     const auto oltp_update_latency = metrics.latency_summary("OLTP_UPDATE");
     const auto olap_sum_latency = metrics.latency_summary("OLAP_SUM");
     const auto olap_filter_latency = metrics.latency_summary("OLAP_FILTER");
-
+    
 
 
     const std::uint64_t total_operations = result.oltp_operations + result.olap_operations;
@@ -114,6 +141,60 @@ int main(){
     std::cout << "OLAP_SUM P50/P90/P99: " << olap_sum_latency.p50_us << " / " << olap_sum_latency.p90_us << " / " << olap_sum_latency.p99_us << '\n';
     std::cout << "OLAP_FILTER P50/P90/P99: " << olap_filter_latency.p50_us << " / " << olap_filter_latency.p90_us << " / " << olap_filter_latency.p99_us << '\n';
 
+    std::ofstream summary("../results/summary/benchmark_summary.csv", std::ios::app);
+    if (!summary) {
+        std::cerr<< "Failed to open benchmark summary CSV.\n";
+        return 1;
+    }
+    if (summary.tellp() ==0){
+        summary << "rows,"
+        << "threads,"
+        << "operations_per_thread,"
+        << "oltp_percent,"
+        << "batch_size,"
+        << "oltp_ops,"
+        << "olap_ops,"
+        << "elapsed_seconds,"
+        << "total_throughput,"
+        << "oltp_throughput,"
+        << "olap_throughput,"
+        << "oltp_read_p50,"
+        << "oltp_read_p90,"
+        << "oltp_read_p99,"
+        << "oltp_update_p50,"
+        << "oltp_update_p90,"
+        << "oltp_update_p99,"
+        << "olap_sum_p50,"
+        << "olap_sum_p90,"
+        << "olap_sum_p99,"
+        << "olap_filter_p50,"
+        << "olap_filter_p90,"
+        << "olap_filter_p99\n";
+    }
+    summary
+    << row_count <<','
+    << thread_count << ','
+    << operations_per_thread << ','
+    << oltp_percent << ','
+    << sync_batch_size << ','
+    << result.oltp_operations << ','
+    << result.olap_operations << ','
+    << result.elapsed_seconds << ','
+    << result.throughput_ops_per_second << ','
+    << result.oltp_throughput_ops_per_second << ','
+    << result.olap_throughput_ops_per_second << ','
+    << oltp_read_latency.p50_us << ','
+    << oltp_read_latency.p90_us << ','
+    << oltp_read_latency.p99_us << ','
+    << oltp_update_latency.p50_us << ','
+    << oltp_update_latency.p90_us << ','
+    << oltp_update_latency.p99_us << ','
+    << olap_sum_latency.p50_us << ','
+    << olap_sum_latency.p90_us << ','
+    << olap_sum_latency.p99_us << ','
+    << olap_filter_latency.p50_us << ','
+    << olap_filter_latency.p90_us << ','
+    << olap_filter_latency.p99_us << '\n';
 
     const double row_sum =row_store.sum_price_scalar();
     const double column_sum =column_store.sum_price_scalar();
@@ -125,7 +206,7 @@ int main(){
 
     std::cout << "\nFinal row/column consistncy:  " << (stores_consistent ? "PASSED" : "FAILED") << '\n';
     std::cout << "\nMixed woarkload correctness:  " << (correct ? "PASSED" : "FAILED") << '\n';
-    std::cout << "Raw trace file:" << "../results/raw/operations.csv" << '\n';
+    std::cout << "Raw trace file:" << trace_path << '\n';
 
     return correct ? 0: 1;
 }

@@ -39,7 +39,7 @@ LatencySummary MetricsCollector::latency_summary(const std::string& operation_ty
     return summary;
 }
 
-void MetricsCollector::write_oprations_csv(const std::string& path) const{
+void MetricsCollector::write_operations_csv(const std::string& path) const{
     std::ofstream output(path);
     if(!output){
         throw std::runtime_error("Unable to open trace csv file");

@@ -22,6 +22,8 @@ struct WorkloadResult{
     std::uint64_t synchronized_changes = 0;
     double elapsed_seconds = 0.0;
     double throughput_ops_per_second =0.0;
+    double oltp_throughput_ops_per_second = 0.0;
+    double olap_throughput_ops_per_second = 0.0;
 };
 
 class WorkloadRunner {

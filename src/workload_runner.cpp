@@ -212,6 +212,8 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
 
     if (result.elapsed_seconds > 0.0) {
         result.throughput_ops_per_second =static_cast<double>(total_operations) /result.elapsed_seconds;
+        result.oltp_throughput_ops_per_second = static_cast<double>(result.olap_operations)/result.elapsed_seconds;
+        result.olap_throughput_ops_per_second = static_cast<double>(result.olap_operations)/result.elapsed_seconds;
     }
 
     return result;
