@@ -22,6 +22,7 @@ int main(int argc, char* argv[]){
     std::size_t operations_per_thread = 1000;
     int oltp_percent = 50;
     std::size_t sync_batch_size = 16;
+    std::size_t run_id=1;
     constexpr std::size_t materialization_threshold = 50;
     /*constexpr std::size_t sync_batch_size=4;*/
 
@@ -39,6 +40,9 @@ int main(int argc, char* argv[]){
     }
     if (argc > 5){
         sync_batch_size = static_cast<std::size_t>(std::stoull(argv[5]));
+    }
+    if (argc >6){
+        run_id = static_cast<std::size_t>(std::stoull(argv[6]));
     }
 
 
@@ -87,7 +91,10 @@ int main(int argc, char* argv[]){
     //std::cout << "Region materialized: " << (column_store.has_column(ColumnId::Region)? "YES": "NO")<< '\n';
 
 
-    //std::cout << "Rows: " << row_count << '\n';
+    
+    
+    std::cout << "Rows: " << row_count << '\n';
+    std::cout << "Run: " << run_id << '\n';
     //std::cout << "SIMD available:: " << (SelectiveColumnStore::simd_available() ? "YES" : "NO")  << '\n';
     /*constexpr std::size_t target_row = 10;
     const double original_row_price = row_store.at(target_row).price;
@@ -113,7 +120,7 @@ int main(int argc, char* argv[]){
     WorkloadRunner runner(row_store,column_store, metrics);
     const WorkloadResult result = runner.run(config);
     const std::string trace_path = "../results/raw/operations_"+ std::to_string(row_count)+ "_"+
-    std::to_string(thread_count) + "_" + std::to_string(oltp_percent) + "_" + std::to_string(sync_batch_size) + ".csv";
+    std::to_string(thread_count) + "_" + std::to_string(oltp_percent) + "_" + std::to_string(sync_batch_size) + "_run" + std::to_string(run_id)+ ".csv";
     metrics.write_operations_csv(trace_path);
 
     std::cout << "Raw trace file: " << trace_path << '\n';
@@ -147,8 +154,9 @@ int main(int argc, char* argv[]){
         return 1;
     }
     if (summary.tellp() ==0){
-        summary << "rows,"
-        << "threads,"
+        summary << "run,"
+        << "rows,"
+        << "thread,"
         << "operations_per_thread,"
         << "oltp_percent,"
         << "batch_size,"
@@ -172,6 +180,7 @@ int main(int argc, char* argv[]){
         << "olap_filter_p99\n";
     }
     summary
+    << run_id << ','
     << row_count <<','
     << thread_count << ','
     << operations_per_thread << ','

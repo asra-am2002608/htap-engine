@@ -20,6 +20,7 @@ OLTP_LIST=(80 50 20)
 BATCH_LIST=(16)
 
 OPERATIONS_PER_THREAD=1000
+REPEAT_COUNT=5
 
 for rows in "${ROWS_LIST[@]}"
 do
@@ -29,19 +30,24 @@ do
         do
             for batch in "${BATCH_LIST[@]}"
             do
-                echo "--------------------------------"
-                echo "Rows=$rows"
-                echo "Threads=$threads"
-                echo "OLTP=$oltp%"
-                echo "Batch=$batch"
-                echo "--------------------------------"
+                for run in $(seq 1 "$REPEAT_COUNT")
+                do
+                    echo "-------------------"
+                    echo "Rows=$rows"
+                    echo "Threads=$threads"
+                    echo "OLTP=$oltp%"
+                    echo "Batch=$batch"
+                    echo "Run=$run/$REPEAT_COUNT"
+                    echo "-------------------"
 
-                ./htap_engine \
-                    "$rows" \
-                    "$threads" \
-                    "$OPERATIONS_PER_THREAD" \
-                    "$oltp" \
-                    "$batch"
+                    ./htap_engine \
+                        "$rows" \
+                        "$threads" \
+                        "$OPERATIONS_PER_THREAD" \
+                        "$oltp" \
+                        "$batch" \
+                        "$run"
+                done
             done
         done
     done
