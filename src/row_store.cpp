@@ -83,3 +83,7 @@ bool RowStore::update_price_at(std::size_t row_index, double new_price){
     rows_[row_index].price=new_price;
     return true;
 }
+
+std::size_t RowStore::estimated_memory_bytes() const {
+    return rows_.capacity() * sizeof(Order);
+}

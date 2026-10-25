@@ -44,7 +44,7 @@ void MetricsCollector::write_operations_csv(const std::string& path) const{
     if(!output){
         throw std::runtime_error("Unable to open trace csv file");
     }
-    output <<"timestamp_us," << "thread_id,"<< "operation_type," << "latency_us," << "row_indes," << "freshness_us\n,";
+    output <<"timestamp_us," << "thread_id,"<< "operation_type," << "latency_us," << "row_index," << "freshness_us\n";
     std::lock_guard lock(mutex_);
     for (const auto& trace : traces_){
         output <<trace.timestamp_us << ',' << trace.thread_id << ',' << trace.operation_type << ',' << trace.latency_us << ',' << trace.row_index << ',' << trace.freshness_us << '\n';

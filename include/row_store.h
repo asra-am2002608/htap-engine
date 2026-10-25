@@ -19,7 +19,7 @@ public:
     std::size_t count_price_greater_than_scalar(double threshold) const;
     const Order& at(std::size_t row_index) const;
     bool update_price_at(std::size_t row_index, double new_price);
-
+    std::size_t estimated_memory_bytes() const;
 private:
     std::vector<Order> rows_;
     

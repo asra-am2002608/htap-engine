@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 class RowStore;
 class SelectiveColumnStore;
@@ -28,7 +29,7 @@ struct WorkloadResult{
 
 class WorkloadRunner {
 public:
-    WorkloadRunner(RowStore& row_store,SelectiveColumnStore& column_store, MetricsCollector& metrics);
+    WorkloadRunner(RowStore& row_store,SelectiveColumnStore& column_store, MetricsCollector& metrics, const std::string& benchmark_mode);
     WorkloadResult run(const WorkloadConfig& config);
 
 
@@ -36,4 +37,5 @@ private:
     RowStore& row_store_;
     SelectiveColumnStore& column_store_;
     MetricsCollector& metrics_;
+    std::string benchmark_mode_;
 };

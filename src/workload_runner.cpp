@@ -14,8 +14,8 @@
 #include <thread>
 #include <vector>
 
-WorkloadRunner::WorkloadRunner(RowStore& row_store, SelectiveColumnStore& column_store, MetricsCollector& metrics)
-    : row_store_(row_store), column_store_(column_store), metrics_(metrics) {}
+WorkloadRunner::WorkloadRunner(RowStore& row_store, SelectiveColumnStore& column_store, MetricsCollector& metrics, const std::string& benchmark_mode)
+    : row_store_(row_store), column_store_(column_store), metrics_(metrics), benchmark_mode_(benchmark_mode) {}
 
 WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
     using Clock = std::chrono::steady_clock;
@@ -124,9 +124,8 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
 
                                 commit_time = Clock::now();
 
-                                {
+                                if (benchmark_mode_ != "row") {
                                     std::lock_guard buffer_lock(buffer_mutex);
-
                                     change_buffer.push(ChangeRecord{row_index,ColumnId::Price,new_price,commit_time});
                                 }
                             }
@@ -147,7 +146,60 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
                     // OLAP
                     // --------------------
 
+
                     else {
+
+                        // -----------------------------------------
+                        // ROW-ONLY BASELINE
+                        // -----------------------------------------
+                        if (benchmark_mode_ == "row") {
+
+                            std::shared_lock lock(row_mutex);
+                            if (operation % 2 == 0) {
+                                operation_type = "OLAP_SUM";
+                                const double sum =row_store_.sum_price_scalar();
+                                local_checksum += static_cast<std::uint64_t>(sum);
+                            }
+                            else {
+                                operation_type = "OLAP_FILTER";
+                                const std::size_t count =row_store_.count_price_greater_than_scalar(500.0);
+                                local_checksum += count;
+                            }
+                        }
+                        else if (benchmark_mode_ == "full_scalar"){
+                            std::shared_lock lock(column_mutex);
+                            if (operation % 2 == 0) {
+                                operation_type = "OLAP_SUM";
+                                const double sum = column_store_.sum_price_scalar();
+                                local_checksum +=static_cast<std::uint64_t>(sum);
+                            }
+                        
+                            else{
+                                operation_type = "OLAP_FILTER";
+                                const std::size_t count = column_store_.count_price_greater_than_scalar(500);
+                                local_checksum +=count;
+                            }
+                        }
+                        // -----------------------------------------
+                        // CURRENT SELECTIVE SIMD SYSTEM
+                        // -----------------------------------------
+                        else {
+                            std::shared_lock lock(column_mutex);
+                            if (operation % 2 == 0) {
+                                operation_type = "OLAP_SUM";
+                                const double sum =column_store_.sum_price_simd();
+                                local_checksum +=static_cast<std::uint64_t>(sum);
+                            }
+                            else {
+                                operation_type = "OLAP_FILTER";
+                                const std::size_t count =column_store_.count_price_greater_than_simd(500.0);
+                                local_checksum += count;
+                            }
+                        }
+
+                        olap_completed.fetch_add(1,std::memory_order_relaxed);
+                    }
+/*                     else {
                         std::shared_lock lock(column_mutex);
 
                         if (operation % 2 == 0) {
@@ -163,19 +215,13 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
                         }
 
                         olap_completed.fetch_add(1,std::memory_order_relaxed);
-                    }
+                    } */
                     const auto operation_end =Clock::now();
-
                     const double latency_us =std::chrono::duration<double,std::micro>(operation_end -operation_start).count();
-
                     const std::uint64_t timestamp_us =static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(operation_end.time_since_epoch()).count());
-
                     metrics_.record(OperationTrace{timestamp_us,thread_id,operation_type,latency_us,trace_row_index,0.0});
 
                 }
-
-
-
                 if (local_checksum == 0) {
                     std::this_thread::yield();
                 }
@@ -183,36 +229,28 @@ WorkloadResult WorkloadRunner::run(const WorkloadConfig& config) {
         );
     }
 
-    // Wait for workload workers.
+
     for (auto& worker : workers) {
         worker.join();
     }
 
-    // Tell synchronization thread that
-    // no more updates will arrive.
+ 
     stop_sync.store(true,std::memory_order_relaxed);
 
     sync_thread.join();
 
     const auto end_time =Clock::now();
 
-    // ------------------------------------
-    // Produce results
-    // ------------------------------------
-
     result.oltp_operations =oltp_completed.load();
-
     result.olap_operations = olap_completed.load();
-
     result.synchronized_changes =synchronized_changes.load();
-
     result.elapsed_seconds =std::chrono::duration<double>(end_time - start_time).count();
 
     const std::uint64_t total_operations = result.oltp_operations +result.olap_operations;
 
     if (result.elapsed_seconds > 0.0) {
         result.throughput_ops_per_second =static_cast<double>(total_operations) /result.elapsed_seconds;
-        result.oltp_throughput_ops_per_second = static_cast<double>(result.olap_operations)/result.elapsed_seconds;
+        result.oltp_throughput_ops_per_second = static_cast<double>(result.oltp_operations)/result.elapsed_seconds;
         result.olap_throughput_ops_per_second = static_cast<double>(result.olap_operations)/result.elapsed_seconds;
     }
 

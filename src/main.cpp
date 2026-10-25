@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <string>
 #include <fstream>
+#include <vector>
 #include "row_store.h"
 #include "data_generator.h"
 #include "column_store.h"
@@ -23,6 +24,7 @@ int main(int argc, char* argv[]){
     int oltp_percent = 50;
     std::size_t sync_batch_size = 16;
     std::size_t run_id=1;
+    std::string benchmark_mode = "selective_simd";
     constexpr std::size_t materialization_threshold = 50;
     /*constexpr std::size_t sync_batch_size=4;*/
 
@@ -44,7 +46,15 @@ int main(int argc, char* argv[]){
     if (argc >6){
         run_id = static_cast<std::size_t>(std::stoull(argv[6]));
     }
+    if (argc >7){
+        benchmark_mode = argv[7];
+    }
 
+    if (benchmark_mode != "row" && benchmark_mode != "full_scalar" && benchmark_mode != "full_simd" && benchmark_mode != "selective_simd"){
+        std::cerr << "Invalid benchmark mode: " << benchmark_mode << '\n';
+        std::cerr << "Valid modes: " << "row, " << "full_scalar, " << "full_simd, " << "selective_simd\n";
+        return 1;
+    }
 
 
     DataGenerator generator(42);
@@ -76,17 +86,55 @@ int main(int argc, char* argv[]){
         profiler.record_access(ColumnId::Status);
     }
    
-    const auto selected_columns = profiler.selected_columns();
+
+    std::vector<ColumnId> selected_columns;
+    if(benchmark_mode == "row"){
+        selected_columns.clear();
+    }
+    else if( benchmark_mode =="full_scalar" || benchmark_mode == "full_simd"){
+        selected_columns = { ColumnId::Region, ColumnId::Quantity, ColumnId::Price, ColumnId::Status};
+    }
+    else {
+        selected_columns = profiler.selected_columns();
+    }
+    //const auto selected_columns = profiler.selected_columns();
 
 
     SelectiveColumnStore column_store(row_count);
     column_store.materialize(row_store.rows(),selected_columns);
     
-    
-    std::cout << "Rows: "<< row_count<< '\n';
+    const std::size_t row_store_bytes = row_store.estimated_memory_bytes();
+    const std::size_t column_store_bytes = benchmark_mode == "row" ? 0 : column_store.estimated_memory_bytes();
+    const std::size_t total_estimated_bytes = row_store_bytes + column_store_bytes;
+    const double row_store_mb = static_cast<double>(row_store_bytes) / (1024.0 * 1024.0);
+    const double column_store_mb = static_cast<double>(column_store_bytes) / (1024.0 * 1024.0);
+    const double total_estimated_mb = static_cast<double>(total_estimated_bytes) / (1024.0 * 1024.0);
 
+
+    const std::size_t full_replica_bytes = row_count * (sizeof(std::uint16_t)+ sizeof(std::uint32_t)+ sizeof(double) + sizeof(std::uint8_t));
+    double replica_reduction_percent = 0.0;
+    if (benchmark_mode == "selective_simd" && full_replica_bytes >0){
+        replica_reduction_percent = 100.0 * ( 1.0 - static_cast<double>(column_store_bytes)/static_cast<double>(full_replica_bytes));
+    
+    }
+
+    std::cout << std::fixed << std::setprecision(2);
+    std::cout << "\nMemory estimate\n";
+    std::cout << "Row store: " << row_store_mb << "MB\n";
+    std::cout << "Analytical replica:" << column_store_mb << "MB\n";
+    std::cout << "Total estimate storage: " << total_estimated_mb << "MB\n";
+
+    if (benchmark_mode == "selective_simd"){
+        std::cout << "Analytical replica reduction vs full:" << replica_reduction_percent << "%\n";
+    }
+
+    std::cout << "Rows: "<< row_count<< '\n';
     std::cout << "Price materialized: "<< (column_store.has_column(ColumnId::Price)? "YES": "NO" ) << '\n';
     std::cout << "SIMD available:: " << (SelectiveColumnStore::simd_available() ? "YES" : "NO")  << '\n';
+    std::cout << "Quantity materialized: "<< (column_store.has_column(ColumnId::Quantity)? "YES": "NO" ) << '\n';
+    std::cout << "Status materialized: "<< (column_store.has_column(ColumnId::Status)? "YES": "NO" ) << '\n';
+
+
 
     //std::cout << "Region materialized: " << (column_store.has_column(ColumnId::Region)? "YES": "NO")<< '\n';
 
@@ -95,6 +143,7 @@ int main(int argc, char* argv[]){
     
     std::cout << "Rows: " << row_count << '\n';
     std::cout << "Run: " << run_id << '\n';
+    std::cout << "benchmark mode: " << benchmark_mode << '\n';
     //std::cout << "SIMD available:: " << (SelectiveColumnStore::simd_available() ? "YES" : "NO")  << '\n';
     /*constexpr std::size_t target_row = 10;
     const double original_row_price = row_store.at(target_row).price;
@@ -117,9 +166,9 @@ int main(int argc, char* argv[]){
     std::cout << "Target OLTP percentage:  " << config.oltp_percent << "%\n";
 
     MetricsCollector metrics;
-    WorkloadRunner runner(row_store,column_store, metrics);
+    WorkloadRunner runner(row_store,column_store, metrics, benchmark_mode);
     const WorkloadResult result = runner.run(config);
-    const std::string trace_path = "../results/raw/operations_"+ std::to_string(row_count)+ "_"+
+    const std::string trace_path = "../results/raw/operations_"+ benchmark_mode+ "_" +std::to_string(row_count)+ "_"+
     std::to_string(thread_count) + "_" + std::to_string(oltp_percent) + "_" + std::to_string(sync_batch_size) + "_run" + std::to_string(run_id)+ ".csv";
     metrics.write_operations_csv(trace_path);
 
@@ -154,7 +203,8 @@ int main(int argc, char* argv[]){
         return 1;
     }
     if (summary.tellp() ==0){
-        summary << "run,"
+        summary << "mode,"
+        << "run,"
         << "rows,"
         << "thread,"
         << "operations_per_thread,"
@@ -177,9 +227,15 @@ int main(int argc, char* argv[]){
         << "olap_sum_p99,"
         << "olap_filter_p50,"
         << "olap_filter_p90,"
-        << "olap_filter_p99\n";
+        << "olap_filter_p99,"
+        << "row_store_bytes,"
+        << "column_store_bytes,"
+        << "total_estimated_bytes,"
+        << "replica_reduction_percent"
+        << '\n';
     }
     summary
+    << benchmark_mode << ','
     << run_id << ','
     << row_count <<','
     << thread_count << ','
@@ -203,149 +259,39 @@ int main(int argc, char* argv[]){
     << olap_sum_latency.p99_us << ','
     << olap_filter_latency.p50_us << ','
     << olap_filter_latency.p90_us << ','
-    << olap_filter_latency.p99_us << '\n';
+    << olap_filter_latency.p99_us << ','
+    << row_store_bytes << ','
+    << column_store_bytes << ','
+    << total_estimated_bytes << ','
+    << replica_reduction_percent << '\n';
 
-    const double row_sum =row_store.sum_price_scalar();
-    const double column_sum =column_store.sum_price_scalar();
-    const double differences = std::abs(row_sum- column_sum);
-    const double tolerance = std::abs(row_sum) * 1e-10;
-    const bool operations_count_correct = total_operations ==config.thread_count * config.operations_per_thread;
-    const bool stores_consistent = differences <= tolerance;
+    //const double row_sum =row_store.sum_price_scalar();
+    //const double column_sum =column_store.sum_price_scalar();
+    //const double differences = std::abs(row_sum- column_sum);
+    //const double tolerance = std::abs(row_sum) * 1e-10;
+    
+    
+    const bool operations_count_correct = total_operations == config.thread_count * config.operations_per_thread;
+    bool stores_consistent = true;
+
+    if (benchmark_mode == "row") {
+        std::cout<< "\nRow-only execution check: "<< (operations_count_correct ? "PASSED" : "FAILED")<< '\n';
+    }
+    else {
+        const double row_sum =row_store.sum_price_scalar();
+        const double column_sum =column_store.sum_price_scalar();
+        const double difference =std::abs(row_sum - column_sum);
+        const double tolerance =std::abs(row_sum) * 1e-10;
+        stores_consistent =difference <= tolerance;
+        std::cout << "\nFinal row/column consistency: " << (stores_consistent ? "PASSED" : "FAILED") << '\n';
+    }
+
     const bool correct = operations_count_correct && stores_consistent;
 
-    std::cout << "\nFinal row/column consistncy:  " << (stores_consistent ? "PASSED" : "FAILED") << '\n';
-    std::cout << "\nMixed woarkload correctness:  " << (correct ? "PASSED" : "FAILED") << '\n';
-    std::cout << "Raw trace file:" << trace_path << '\n';
+    std::cout << "\nMixed workload correctness: " << (correct ? "PASSED" : "FAILED") << '\n';
+    std::cout << "Raw trace file: "<< trace_path<< '\n';
+    return correct ? 0 : 1;
+    
 
-    return correct ? 0: 1;
 }
 
-
-   /* const double sum_difference = std::abs(scalar_sum - simd_sum);
-    const double sum_tolerance = std::abs(scalar_sum) * 1e-10;
-    const bool sum_correct = sum_difference<= sum_tolerance;
-
-    constexpr double threshold = 500.0;
-    const std::size_t scalar_count = column_store.count_price_greater_than_scalar(threshold);
-    const std::size_t simd_count = column_store.count_price_greater_than_simd(threshold);
-    
-    std::cout << "\nCount Price (price > 500)\n";
-    std::cout << "Scalar " << scalar_count<< '\n';
-    std::cout << "SIMD " << simd_count << '\n';
-    const bool count_correct = scalar_count ==simd_count;
-
-    const bool correct = sum_correct && count_correct; 
-    
-    std::cout <<"\nSIMD correctness: " << (correct ? "Passed " : "Failed ") << '\n';
-    return correct ? 0:1;
-}*/
-
-
-/*
-    std::cout << "Before update \n";
-    std::cout << "Row-store price:  " << original_row_price << '\n';
-    std::cout << "Column-store price:  " << original_column_price << '\n';
-
-    const double new_price = original_row_price+100.0;
-    const auto commit_time = std::chrono::steady_clock::now();
-    const std::uint64_t order_id = row_store.at(target_row).order_id;
-
-    row_store.update_price(order_id, new_price);
-
-    change_buffer.push(ChangeRecord{
-        target_row, ColumnId::Price, new_price, commit_time
-
-    });
-
-
-    const  double stale_column_price = selective_column_store.price_at(target_row);
-    std::cout << "\nAfter OLTP update, before flush \n";
-    std::cout << "Row-store price:  " << row_store.at(target_row).price << '\n';
-    std::cout << "Column-store price:  " << stale_column_price << '\n';
-
-    if (change_buffer.should_flush()){
-        change_buffer.flush(selective_column_store);
-    }
-
-    std::cout << "\n Buffer size after 1 update:  " << change_buffer.size() << '\n';
-
-
-    const std::size_t applied = change_buffer.flush(selective_column_store);
-    const auto visible_time = std::chrono::steady_clock::now();
-    const auto freshness_us = std::chrono::duration_cast<std::chrono::microseconds>(
-        visible_time - commit_time).count();
-    const double syncronized_price = selective_column_store.price_at(target_row);
-
-    std::cout << "\nAfteer Syncronization\n";
-    std::cout << "Row-store price:  " << row_store.at(target_row).price << '\n';
-    std::cout << "Column-store price:  " << syncronized_price << '\n';
-    std::cout << "Changes applied: " << applied << '\n';
-    std::cout << "freshness delay: " << freshness_us << "us\n";
-
-    const bool stale_before_flush = stale_column_price != new_price;
-    const bool synchronized_after_flush = syncronized_price == new_price;
-    const bool correct = stale_before_flush && synchronized_after_flush &&applied ==1;
-    std::cout <<"\nSynchronization correctness: " << (correct ? "Passed " : "Failed ") << '\n';
-
-    return correct ? 0:1;
-
-
-    std::cout << "Workload access counts \n";
-    std::cout << "Price: " << profiler.access_count(ColumnId::Price) << '\n';
-    std::cout << "Region: " << profiler.access_count(ColumnId::Region) << '\n';
-    std::cout << "Quantity: " << profiler.access_count(ColumnId::Quantity) << '\n';
-    std::cout << "Status: " << profiler.access_count(ColumnId::Status) << '\n';
-
-    std::cout << "\nMaterialaztion threshold: \n" << materialization_threshold  << '\n';
-    std::cout << "\nSelected Columns\n";
-
-    std::cout << "Price: " << (selective_column_store.has_column(ColumnId::Price) ? "YES" : "NO") << '\n';
-    std::cout << "Region: " << (selective_column_store.has_column(ColumnId::Region) ? "YES" : "NO") << '\n';
-    std::cout << "Quantity: " << (selective_column_store.has_column(ColumnId::Quantity) ? "YES" : "NO") << '\n';
-    std::cout << "Status: " << (selective_column_store.has_column(ColumnId::Status) ? "YES" : "NO") << '\n';
-
-    bool correct = true;
-    if (!selective_column_store.has_column(ColumnId::Price)){
-        correct = false;
-    }
-    if (!selective_column_store.has_column(ColumnId::Region)){
-        correct = false;
-    }
-    if (selective_column_store.has_column(ColumnId::Quantity)){
-        correct = false;
-    }
-    if (selective_column_store.has_column(ColumnId::Status)){
-        correct = false;
-    }
-
-
-    const double row_sum = row_store.sum_price_scalar();
-    const double selective_sum = selective_column_store.sum_price_scalar();
-    if (std::abs(row_sum - selective_sum) > 0.0001){
-        correct = false;
-    }
-
-    const std::size_t row_region_count = row_store.count_region_scalar(5);
-    const std::size_t selective_region_count = selective_column_store.count_region_scalar(5);
-    if (row_region_count!=selective_region_count){
-        correct = false;
-    }
-    const std::size_t full_bytes = full_column_store.estimated_memory_bytes();
-    const std::size_t selective_bytes = selective_column_store.estimated_memory_bytes();
-
-    const double full_mb =static_cast<double>(full_bytes) / (1024.0 * 1024.0);
-    const double selective_mb =static_cast<double>(selective_bytes) / (1024.0 * 1024.0);
-    const double reduction = 100.0 * (1.0 -static_cast<double>(selective_bytes) / static_cast<double>(full_bytes));
-
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << "\nColumn-store memory estimate\n";
-
-    std::cout <<"Full column store : " << full_mb << "MB\n";
-    std::cout <<"Workload-aware store : " << selective_mb << "MB\n";
-    std::cout <<"Estimated reduction : " << reduction << "%\n";
-
-    std::cout << "\nCorrectness chaeck: \n" << (correct ? "Passed" : "Failed")  << '\n';
-
-    return correct ? 0:1;
-
-}*/
