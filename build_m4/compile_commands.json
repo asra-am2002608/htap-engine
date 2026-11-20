@@ -1,0 +1,56 @@
+[
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/main.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/main.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/main.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/main.cpp.o"
+},
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/row_store.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/row_store.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/row_store.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/row_store.cpp.o"
+},
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/data_generator.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/data_generator.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/data_generator.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/data_generator.cpp.o"
+},
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/column_store.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/column_store.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/column_store.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/column_store.cpp.o"
+},
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/selective_column_store.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/selective_column_store.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/selective_column_store.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/selective_column_store.cpp.o"
+},
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/workload_profiler.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/workload_profiler.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/workload_profiler.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/workload_profiler.cpp.o"
+},
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/change_buffer.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/change_buffer.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/change_buffer.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/change_buffer.cpp.o"
+},
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/workload_runner.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/workload_runner.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/workload_runner.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/workload_runner.cpp.o"
+},
+{
+  "directory": "/Users/esraaalmarzugi/Documents/htap-engine/build_m4",
+  "command": "/usr/bin/c++  -I/Users/esraaalmarzugi/Documents/htap-engine/include -std=gnu++20 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk -Wall -Wextra -Wpedantic -O2 -o CMakeFiles/htap_engine.dir/src/metrics.cpp.o -c /Users/esraaalmarzugi/Documents/htap-engine/src/metrics.cpp",
+  "file": "/Users/esraaalmarzugi/Documents/htap-engine/src/metrics.cpp",
+  "output": "CMakeFiles/htap_engine.dir/src/metrics.cpp.o"
+}
+]

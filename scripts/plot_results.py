@@ -20,16 +20,30 @@ print("Columns:", list(df.columns))
 
 modes = ["row", "full_scalar", "full_simd", "selective_simd"]
 
+styles = {
+    "row": ("o", "-"),
+    "full_scalar": ("s", "--"),
+    "full_simd": ("^", "-."),
+    "selective_simd": ("D", ":"),
+}
+
 #1
 throughput_subset=df[(df["rows"] == 1000000) & (df["oltp_percent"]==50)].copy()
 #subset = subset.sort_values("thread")
 plt.figure()
 
-for mode in modes:
+""" for mode in modes:
     mode_data = throughput_subset[throughput_subset["mode"] == mode].sort_values("thread")
     plt.plot(mode_data["thread"].to_numpy(), mode_data["total_throughput_mean"].to_numpy(), marker="o", label=mode)
 
+ """
 
+for mode in modes:
+    mode_data = throughput_subset[throughput_subset["mode"] == mode].sort_values("thread")
+    marker, linestyle = styles[mode]
+
+    plt.errorbar(mode_data["thread"].to_numpy(),mode_data["total_throughput_mean"].to_numpy(),
+        yerr=mode_data["total_throughput_std"].fillna(0).to_numpy(),marker=marker,linestyle=linestyle,capsize=3,label=mode,)
 
 plt.xlabel("Worker Threads")
 plt.ylabel("Mean Combined Throughput (ops/s)")
@@ -47,10 +61,17 @@ sum_subset = df[(df["rows"] == 1000000) & (df["oltp_percent"] == 50)].copy()
 #subset = subset.sort_values("thread")
 plt.figure()
 
-for mode in modes:
+""" for mode in modes:
     mode_data = sum_subset[sum_subset["mode"] == mode].sort_values("thread")
     plt.plot(mode_data["thread"].to_numpy(), mode_data["olap_sum_p99_mean"].to_numpy(), marker="o", label=mode)
 
+ """
+
+
+for mode in modes:
+    mode_data = sum_subset[sum_subset["mode"] == mode].sort_values("thread")
+    marker, linestyle = styles[mode]
+    plt.errorbar(mode_data["thread"].to_numpy(), mode_data["olap_sum_p99_mean"].to_numpy(), yerr=mode_data["olap_sum_p99_std"].fillna(0).to_numpy(), marker=marker, linestyle=linestyle, capsize=3, label=mode,)
 
 #plt.plot(subset["thread"], subset["olap_filter_p99"], marker="o", label="Price Filter")
 
@@ -61,7 +82,7 @@ plt.xticks([1, 2, 4, 8])
 plt.legend()
 plt.grid(True)
 plt.tight_layout()
-plt.savefig(os.path.join(PLOT_DIR, "olap_sum_p99_vs_thread_by_mode.png.png"),dpi=200,)
+plt.savefig(os.path.join(PLOT_DIR, "olap_sum_p99_vs_thread_by_mode.png"),dpi=200,)
 plt.close()
 
 
@@ -69,9 +90,19 @@ plt.close()
 plt.figure()
 filter_subset = df[(df["rows"] == 1000000) & (df["oltp_percent"] == 50)].copy()
 plt.figure()
-for mode in modes:
+""" for mode in modes:
     mode_data = filter_subset[filter_subset["mode"] == mode].sort_values("thread")
     plt.plot(mode_data["thread"].to_numpy(), mode_data["olap_filter_p99_mean"].to_numpy(), marker="o", label=mode)
+ """
+
+for mode in modes:
+    mode_data = filter_subset[filter_subset["mode"] == mode].sort_values("thread")
+
+    marker, linestyle = styles[mode]
+
+    plt.errorbar(mode_data["thread"].to_numpy(),mode_data["olap_filter_p99_mean"].to_numpy(),
+        yerr=mode_data["olap_filter_p99_std"].fillna(0).to_numpy(),marker=marker,linestyle=linestyle,capsize=3,label=mode,
+    )
 
 plt.xlabel("Worker Thread")
 plt.ylabel("Mean p99 Latency (us)")
@@ -87,10 +118,22 @@ plt.close()
 #4
 subset_mix = df[(df["rows"]==1000000)&(df["thread"]==4)].copy()
 plt.figure()
-for mode in modes:
+""" for mode in modes:
     mode_data = subset_mix[subset_mix["mode"] == mode].copy()
     mode_data = mode_data.sort_values("oltp_percent")
-    plt.plot(mode_data["oltp_percent"], mode_data["total_throughput_mean"], marker="o", label=mode)
+    plt.plot(mode_data["oltp_percent"], mode_data["total_throughput_mean"], marker="o", label=mode) """
+
+
+
+for mode in modes:
+    mode_data = subset_mix[subset_mix["mode"] == mode].sort_values("oltp_percent")
+
+    marker, linestyle = styles[mode]
+    plt.errorbar(
+        mode_data["oltp_percent"].to_numpy(),mode_data["total_throughput_mean"].to_numpy(),yerr=mode_data["total_throughput_std"].fillna(0).to_numpy(),marker=marker,linestyle=linestyle,capsize=3,label=mode,
+    )
+
+
 plt.xlabel("OLTP Percentage")
 plt.ylabel("Mean Combined Throughput (ops/s)")
 plt.title("Throughput by HTAP Workload\n1M Rows, 4 Threads")

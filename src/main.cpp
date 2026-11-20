@@ -270,7 +270,7 @@ int main(int argc, char* argv[]){
     //const double differences = std::abs(row_sum- column_sum);
     //const double tolerance = std::abs(row_sum) * 1e-10;
     
-    
+/*     
     const bool operations_count_correct = total_operations == config.thread_count * config.operations_per_thread;
     bool stores_consistent = true;
 
@@ -286,12 +286,53 @@ int main(int argc, char* argv[]){
         std::cout << "\nFinal row/column consistency: " << (stores_consistent ? "PASSED" : "FAILED") << '\n';
     }
 
-    const bool correct = operations_count_correct && stores_consistent;
+    const bool correct = operations_count_correct && stores_consistent; */
 
-    std::cout << "\nMixed workload correctness: " << (correct ? "PASSED" : "FAILED") << '\n';
-    std::cout << "Raw trace file: "<< trace_path<< '\n';
-    return correct ? 0 : 1;
-    
 
-}
+    const bool operations_count_correct = total_operations == config.thread_count * config.operations_per_thread;
+    bool stores_consistent = true;
+    if (benchmark_mode == "row") {
+        std::cout << "\nRow-only execution check: " << (operations_count_correct ? "PASSED" : "FAILED") << '\n';
+    }
+    else {
+        std::size_t mismatched_rows = 0;
+
+        for (std::size_t i = 0; i < row_store.size(); ++i) {
+
+            const double row_price =row_store.at(i).price;
+            const double column_price =column_store.price_at(i);
+
+            if (row_price != column_price) {
+                ++mismatched_rows;
+                if (mismatched_rows <= 5) {
+                    std::cerr
+                        << "Mismatch at row " << i
+                        << ": row_store="
+                        << std::setprecision(17)
+                        << row_price
+                        << ", column_store="
+                        << column_price
+                        << '\n';
+                }
+            }
+        }
+
+        stores_consistent =(mismatched_rows == 0);
+
+        std::cout
+            << "\nExact row-by-row Price consistency: "
+            << (stores_consistent ? "PASSED" : "FAILED")
+            << '\n';
+
+        std::cout
+            << "Mismatched rows: "
+            << mismatched_rows
+            << '\n';
+    }
+
+    const bool correct =operations_count_correct && stores_consistent;
+        std::cout << "\nMixed workload correctness: " << (correct ? "PASSED" : "FAILED") << '\n';
+        std::cout << "Raw trace file: "<< trace_path<< '\n';
+        return correct ? 0 : 1;
+    }
 
